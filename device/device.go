@@ -47,6 +47,7 @@ var (
 			"vendor": hclspec.NewAttr("vendor", "string", true),
 			"model":  hclspec.NewAttr("model", "string", true),
 			"type":   hclspec.NewAttr("type", "string", true),
+			"count":  hclspec.NewAttr("count", "number", false),
 		})),
 		"fingerprint_period": hclspec.NewDefault(
 			hclspec.NewAttr("fingerprint_period", "string", false),
@@ -59,6 +60,13 @@ type GenericDeviceConfig struct {
 	Type   string `codec:"type"`
 	Vendor string `codec:"vendor"`
 	Model  string `codec:"model"`
+	Count  int    `codec:"count"`
+}
+
+type GenericDevice struct {
+	Type   string
+	Vendor string
+	Model  string
 }
 
 // Config contains configuration information for the plugin.
@@ -82,7 +90,7 @@ type GenericDevicePlugin struct {
 	configuredDevices []GenericDeviceConfig
 
 	// devices mapped with generated IDs for reservation purposes
-	identifiedDevices map[string]GenericDeviceConfig
+	identifiedDevices map[string]GenericDevice
 	deviceLock        sync.RWMutex
 
 	// fingerprintPeriod the period for the fingerprinting loop
@@ -98,7 +106,7 @@ func NewPlugin(log log.Logger) *GenericDevicePlugin {
 	return &GenericDevicePlugin{
 		logger:            log.Named(pluginName),
 		configuredDevices: nil,
-		identifiedDevices: make(map[string]GenericDeviceConfig),
+		identifiedDevices: make(map[string]GenericDevice),
 	}
 }
 

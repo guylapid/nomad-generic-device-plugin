@@ -2,9 +2,9 @@ package device
 
 import (
 	"context"
+	"fmt"
 	"time"
 
-	"github.com/hashicorp/nomad/helper/uuid"
 	"github.com/hashicorp/nomad/plugins/device"
 )
 
@@ -31,9 +31,8 @@ func (d *GenericDevicePlugin) doFingerprint(ctx context.Context, devices chan *d
 //
 // plugin implementations will likely have a native struct provided by the corresonding SDK
 type fingerprintedDevice struct {
-	ID       string
-	config   GenericDeviceConfig
-	PCIBusID string
+	ID     string
+	device GenericDevice
 }
 
 // writeFingerprintToChannel collects fingerprint info, partitions devices into
@@ -46,14 +45,21 @@ func (d *GenericDevicePlugin) writeFingerprintToChannel(devices chan<- *device.F
 		// "discover" the devices we have configured
 		discoveredDevices := make([]*fingerprintedDevice, 0)
 
-		for _, device := range d.configuredDevices {
-			discoveredDevices = append(discoveredDevices, &fingerprintedDevice{
-				// TODO: When is this okay to change?
-				ID:     uuid.Generate(),
-				config: device,
-				// TODO: Do we need this?
-				PCIBusID: uuid.Generate(),
-			})
+		for _, configuredDevice := range d.configuredDevices {
+			count := configuredDevice.Count
+			if count == 0 {
+				count = 1
+			}
+			for deviceIndex := 0; deviceIndex < count; deviceIndex++ {
+				discoveredDevices = append(discoveredDevices, &fingerprintedDevice{
+					ID: fmt.Sprintf("%s/%s/%s/%d", configuredDevice.Type, configuredDevice.Vendor, configuredDevice.Model, deviceIndex),
+					device: GenericDevice{
+						Type:   configuredDevice.Type,
+						Vendor: configuredDevice.Vendor,
+						Model:  configuredDevice.Model,
+					},
+				})
+			}
 		}
 
 		d.logger.Info("Found devices", "count", len(discoveredDevices))
@@ -65,9 +71,9 @@ func (d *GenericDevicePlugin) writeFingerprintToChannel(devices chan<- *device.F
 		// Build Fingerprint response with computed groups and send it over the channel
 		deviceListByDeviceName := make(map[string][]*fingerprintedDevice)
 		for _, device := range discoveredDevices {
-			deviceName := device.config.Model
+			deviceName := device.device.Model
 			deviceListByDeviceName[deviceName] = append(deviceListByDeviceName[deviceName], device)
-			d.identifiedDevices[device.ID] = device.config
+			d.identifiedDevices[device.ID] = device.device
 		}
 
 		// Build Fingerprint response with computed groups and send it over the channel
@@ -90,20 +96,17 @@ func deviceGroupFromFingerprintData(groupName string, deviceList []*fingerprinte
 	devices := make([]*device.Device, 0, len(deviceList))
 	for _, dev := range deviceList {
 		devices = append(devices, &device.Device{
-			ID:      dev.ID,
-			Healthy: true,
-			// TODO: Do we need this?
-			HwLocality: &device.DeviceLocality{
-				PciBusID: dev.PCIBusID,
-			},
+			ID:         dev.ID,
+			Healthy:    true,
+			HwLocality: nil,
 		})
 	}
 
 	deviceGroup := &device.DeviceGroup{
 		// TODO: is this a valid assumption?
-		Vendor: deviceList[0].config.Vendor,
+		Vendor: deviceList[0].device.Vendor,
 		// TODO: is this a valid assumption?
-		Type: deviceList[0].config.Type,
+		Type: deviceList[0].device.Type,
 
 		Name:    groupName,
 		Devices: devices,
