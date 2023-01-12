@@ -119,3 +119,10 @@ Copy the plugin binary to the
 [configure the plugin](https://www.nomadproject.io/docs/configuration/plugin.html) in the client config. Then use the
 [device stanza](https://www.nomadproject.io/docs/job-specification/device.html) in the job file to schedule with
 device support.
+
+Changes by [Guy Lapid](https://github.com/guylapid)
+---------------------------------------------------
+
+- Device ID is now deterministic. This solves a problem where after a client restarted, more devices were used than were available.
+
+- Support a "count" field in the device config. This translates to multiple devices of the same type, vendor and model.
